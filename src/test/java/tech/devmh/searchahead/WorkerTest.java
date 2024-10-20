@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +64,12 @@ public class WorkerTest {
 			System.out.println(json.length());
 			then(json).isNotBlank();
 		}
+		for(String substring : (Iterable<String>) substrings::iterator) {
+			watch.reset();
+			String json = jsonFromMapWithStringBuilder(substring,fullMap);
+			System.out.println(json.length());
+			then(json).isNotBlank();
+		}
 	}
 	
 	@Test
@@ -78,7 +83,6 @@ public class WorkerTest {
 		for(String substring : (Iterable<String>) substrings::iterator) {
 			watch.reset();
 			String json = jsonFromListWithObjectMapper(substring,fullList);
-			System.out.println(json.length());
 			then(json).isNotBlank();
 		}
 	}
@@ -112,13 +116,34 @@ public class WorkerTest {
 			if(null != entries) {
 				SortedSet<Entry> entriesForType = entries.get(substring);
 				if(null != entriesForType) {
-					combined.addAll(entries.get(substring));
+					combined.addAll(entriesForType);
 				}
 			}
 		}
-		timeCheck(true, "jsonFromMapWithObjectMapper() find entries with search string " + substring);
 		String json = mapper.writeValueAsString(combined);
-		timeCheck(true, "jsonFromMapWithObjectMapper() as json with search string " + substring);
+		timeCheck(true, "jsonFromMapWithObjectMapper() with search string " + substring);
+		return json;
+	}
+	
+	private String jsonFromMapWithStringBuilder(String substring, Map<EntryType, Map<String, SortedSet<Entry>>> map) throws Exception {
+		watch.reset();
+		watch.start();
+		StringBuilder builder = new StringBuilder("[ ");
+		for(EntryType type : EntryType.values()) {
+			Map<String, SortedSet<Entry>> entries = map.get(type);
+			if(null != entries) {
+				SortedSet<Entry> entriesForType = entries.get(substring);
+				if(null != entriesForType) {
+					entriesForType.forEach(entry -> {
+						builder.append("{\"type\":\"" + entry.getType() + "\",\"value\":\"" + entry.getValue() + "\"},");
+					});
+				}
+			}
+		}
+		builder.deleteCharAt(builder.length() - 1);
+		builder.append("]");
+		String json = builder.toString();
+		timeCheck(true, "jsonFromMapWithStringBuilder() with search string " + substring);
 		return json;
 	}
 	
@@ -131,9 +156,8 @@ public class WorkerTest {
 				combined.add(entry);
 			}
 		}
-		timeCheck(true, "jsonFromListWithObjectMapper() find entries with search string " + substring);
 		String json = mapper.writeValueAsString(combined);
-		timeCheck(true, "jsonFromListWithObjectMapper() as json with search string " + substring);
+		timeCheck(true, "jsonFromListWithObjectMapper() with search string " + substring);
 		return json;
 	}
 	

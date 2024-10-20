@@ -2,14 +2,14 @@ package tech.devmh.searchahead;
 
 public enum EntryType {
 	
-	ManyBroad(200000,30),
-	ManyModerate(200000,15),
+	ManyBroad(200000,50),
+	ManyModerate(200000,20),
 	ManySlim(200000,5),
-	MediumBroad(10000,30),
-	MediumModerate(10000,15),
+	MediumBroad(10000,50),
+	MediumModerate(10000,20),
 	MediumSlim(10000,5),
-	FewBroad(100,30),
-	FewModerate(100,15),
+	FewBroad(100,50),
+	FewModerate(100,20),
 	FewSlim(100,5);
 	
 	private final int count;
