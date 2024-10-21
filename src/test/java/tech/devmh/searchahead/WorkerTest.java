@@ -8,8 +8,10 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.random.RandomGenerator;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.StopWatch;
@@ -53,23 +55,45 @@ public class WorkerTest {
 	@Test
 	void canBuildFullMap() throws Exception {
 		// given
-		List<String> substrings = List.of("ABC","ABC","AB","A");
+		List<String> substrings = new ArrayList<>(); // List.of("ABC","ABC","AB","A");
+		Random random = Random.from(RandomGenerator.getDefault());
+		for(int i = 0; i < 1000; i++) {
+			substrings.add(util.next(random.nextInt(1,4),VALID_CHARS));
+		}
 		// when
 		Map<EntryType, Map<String, SortedSet<Entry>>> fullMap = classUnderTest.getMap();
 		// then
 		then(fullMap).isNotNull();
+		watch.reset();
+		watch.start();
 		for(String substring : (Iterable<String>) substrings::iterator) {
-			watch.reset();
-			String json = jsonFromMapWithObjectMapper(substring,fullMap);
-			System.out.println(json.length());
-			then(json).isNotBlank();
-		}
-		for(String substring : (Iterable<String>) substrings::iterator) {
-			watch.reset();
 			String json = jsonFromMapWithStringBuilder(substring,fullMap);
-			System.out.println(json.length());
-			then(json).isNotBlank();
 		}
+		timeCheck(true, "jsonFromMapWithStringBuilder()");
+		watch.reset();
+		watch.start();
+		for(String substring : (Iterable<String>) substrings::iterator) {
+			String json = jsonFromMapWithStringBuilderAppend(substring,fullMap);
+		}
+		timeCheck(true, "jsonFromMapWithStringBuilderAppend()");
+		watch.reset();
+		watch.start();
+		for(String substring : (Iterable<String>) substrings::iterator) {
+			String json = jsonFromMapWithStringConcat(substring,fullMap);
+		}
+		timeCheck(true, "jsonFromMapWithStringConcat()");
+		watch.reset();
+		watch.start();
+		for(String substring : (Iterable<String>) substrings::iterator) {
+			String json = jsonFromMapWithStringPlus(substring,fullMap);
+		}
+		timeCheck(true, "jsonFromMapWithStringPlus()");
+		watch.reset();
+		watch.start();
+		for(String substring : (Iterable<String>) substrings::iterator) {
+			String json = jsonFromMapWithObjectMapper(substring,fullMap);
+		}
+		timeCheck(true, "jsonFromMapWithObjectMapper()");
 	}
 	
 	@Test
@@ -81,7 +105,6 @@ public class WorkerTest {
 		// then
 		then(fullList).isNotNull();
 		for(String substring : (Iterable<String>) substrings::iterator) {
-			watch.reset();
 			String json = jsonFromListWithObjectMapper(substring,fullList);
 			then(json).isNotBlank();
 		}
@@ -108,8 +131,6 @@ public class WorkerTest {
 	}
 	
 	private String jsonFromMapWithObjectMapper(String substring, Map<EntryType, Map<String, SortedSet<Entry>>> map) throws Exception {
-		watch.reset();
-		watch.start();
 		SortedSet<Entry> combined = new TreeSet<>();
 		for(EntryType type : EntryType.values()) {
 			Map<String, SortedSet<Entry>> entries = map.get(type);
@@ -120,14 +141,10 @@ public class WorkerTest {
 				}
 			}
 		}
-		String json = mapper.writeValueAsString(combined);
-		timeCheck(true, "jsonFromMapWithObjectMapper() with search string " + substring);
-		return json;
+		return mapper.writeValueAsString(combined);
 	}
 	
 	private String jsonFromMapWithStringBuilder(String substring, Map<EntryType, Map<String, SortedSet<Entry>>> map) throws Exception {
-		watch.reset();
-		watch.start();
 		StringBuilder builder = new StringBuilder("[ ");
 		for(EntryType type : EntryType.values()) {
 			Map<String, SortedSet<Entry>> entries = map.get(type);
@@ -142,23 +159,75 @@ public class WorkerTest {
 		}
 		builder.deleteCharAt(builder.length() - 1);
 		builder.append("]");
-		String json = builder.toString();
-		timeCheck(true, "jsonFromMapWithStringBuilder() with search string " + substring);
-		return json;
+		return builder.toString();
+	}
+	
+	private String jsonFromMapWithStringBuilderAppend(String substring, Map<EntryType, Map<String, SortedSet<Entry>>> map) throws Exception {
+		StringBuilder builder = new StringBuilder("[ ");
+		for(EntryType type : EntryType.values()) {
+			Map<String, SortedSet<Entry>> entries = map.get(type);
+			if(null != entries) {
+				SortedSet<Entry> entriesForType = entries.get(substring);
+				if(null != entriesForType) {
+					entriesForType.forEach(entry -> {
+						builder.append("{\"type\":\"")
+						.append(entry.getType())
+						.append("\",\"value\":\"")
+						.append(entry.getValue())
+						.append("\"},");
+					});
+				}
+			}
+		}
+		builder.deleteCharAt(builder.length() - 1);
+		builder.append("]");
+		return builder.toString();
+	}
+	
+	private String jsonFromMapWithStringConcat(String substring, Map<EntryType, Map<String, SortedSet<Entry>>> map) throws Exception {
+		String json = "[ ";
+		for(EntryType type : EntryType.values()) {
+			Map<String, SortedSet<Entry>> entries = map.get(type);
+			if(null != entries) {
+				SortedSet<Entry> entriesForType = entries.get(substring);
+				if(null != entriesForType) {
+					for(Entry entry : entriesForType) {
+						json = json.concat("{\"type\":\"")
+								.concat(entry.getType().toString())
+								.concat("\",\"value\":\"")
+								.concat(entry.getValue())
+								.concat("\"},");
+					}
+				}
+			}
+		}
+		return json.concat("]");
+	}
+	
+	private String jsonFromMapWithStringPlus(String substring, Map<EntryType, Map<String, SortedSet<Entry>>> map) throws Exception {
+		String json = "[ ";
+		for(EntryType type : EntryType.values()) {
+			Map<String, SortedSet<Entry>> entries = map.get(type);
+			if(null != entries) {
+				SortedSet<Entry> entriesForType = entries.get(substring);
+				if(null != entriesForType) {
+					for(Entry entry : entriesForType) {
+						json += "{\"type\":\"" + entry.getType() + "\",\"value\":\"" + entry.getValue() + "\"},";
+					}
+				}
+			}
+		}
+		return json += "]";
 	}
 	
 	private String jsonFromListWithObjectMapper(String substring, List<Entry> list) throws Exception {
-		watch.reset();
-		watch.start();
 		SortedSet<Entry> combined = new Worker.BoundedTreeSet<>(MAX_ENTRIES_PER_TYPE * EntryType.values().length);
 		for(Entry entry : list) {
 			if(entry.getValue().contains(substring)) {
 				combined.add(entry);
 			}
 		}
-		String json = mapper.writeValueAsString(combined);
-		timeCheck(true, "jsonFromListWithObjectMapper() with search string " + substring);
-		return json;
+		return mapper.writeValueAsString(combined);
 	}
 	
 	private Duration timeCheck(boolean log, String logMessage) {
@@ -166,7 +235,7 @@ public class WorkerTest {
 		Duration dur = watch.getSplitDuration();
 		watch.unsplit();
 		if(log) {
-			System.out.println(dur.toMillis() + "ms elapsed : " + logMessage);
+			System.out.println(dur.toMillis() + " ms elapsed : " + logMessage);
 		}
 		return dur;
 	}
